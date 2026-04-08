@@ -1,8 +1,7 @@
 
-  # Design System SaaS Landing Page
+  # INVENTARIO_DEPORTIVO
 
-  This is a code bundle for Design System SaaS Landing Page. The original project is available at https://www.figma.com/design/TlnUXLe6j7IDU4VPeuuSTb/Design-System-SaaS-Landing-Page.
-
+  This is a code bundle for INVENTARIO_DEPORTIVO
   ## Running the code
 
   Run `npm i` to install the dependencies.
