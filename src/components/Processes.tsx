@@ -1,337 +1,503 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-
-const initialHistory = [
-  { id: 1, tipo: 'Entrada', producto: 'Balón de Futbol', cantidad: 20, fecha: '15/01/2024', usuario: 'Admin' },
-  { id: 2, tipo: 'Salida', producto: 'Camiseta Deportiva', cantidad: 10, fecha: '14/01/2024', usuario: 'Carlos' },
-  { id: 3, tipo: 'Entrada', producto: 'Zapatillas Running', cantidad: 15, fecha: '14/01/2024', usuario: 'Admin' },
-  { id: 4, tipo: 'Salida', producto: 'Raqueta de Tenis', cantidad: 5, fecha: '13/01/2024', usuario: 'Maria' },
-  { id: 5, tipo: 'Entrada', producto: 'Balón de Baloncesto', cantidad: 12, fecha: '13/01/2024', usuario: 'Admin' },
-];
+import {
+  obtenerProductos,
+  actualizarProducto,
+  type Producto,
+} from '../services/productosService';
 
 export default function Processes() {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [processType, setProcessType] = useState('Entrada');
-  const [history, setHistory] = useState(initialHistory);
-  const [viewingProcess, setViewingProcess] = useState<any>(null);
 
-  const handleDelete = (id: number) => {
-    if (confirm('¿Estás seguro de eliminar este proceso?')) {
-      setHistory(history.filter(h => h.id !== id));
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [showModal, setShowModal] = useState(false);
+
+  const [tipo, setTipo] = useState<'Entrada' | 'Salida'>('Entrada');
+  const [productoId, setProductoId] = useState<number>(0);
+  const [cantidad, setCantidad] = useState<number>(1);
+
+  // CARGAR PRODUCTOS DESDE API
+  useEffect(() => {
+    cargarProductos();
+  }, []);
+
+  async function cargarProductos() {
+    try {
+
+      setLoading(true);
+      setError('');
+
+      const data = await obtenerProductos();
+
+      setProductos(data);
+
+    } catch (e: any) {
+
+      console.error(e);
+
+      setError(
+        e.message ||
+        'Error conectando con API'
+      );
+
+    } finally {
+
+      setLoading(false);
+
     }
-  };
+  }
 
-  const handleView = (process: any) => {
-    setViewingProcess(process);
-    setShowViewModal(true);
-  };
+  // REGISTRAR MOVIMIENTO
+  async function registrarMovimiento(e: React.FormEvent) {
+
+    e.preventDefault();
+
+    try {
+
+      const producto = productos.find(
+        p => p.id === productoId
+      );
+
+      if (!producto) {
+        alert('Selecciona un producto');
+        return;
+      }
+
+      let nuevoStock = producto.stock;
+
+      if (tipo === 'Entrada') {
+
+        nuevoStock += cantidad;
+
+      } else {
+
+        if (cantidad > producto.stock) {
+          alert('No hay suficiente stock');
+          return;
+        }
+
+        nuevoStock -= cantidad;
+      }
+
+      // ACTUALIZAR API
+      await actualizarProducto(producto.id, {
+        nombre: producto.nombre,
+        precio: producto.precio,
+        stock: nuevoStock,
+      });
+
+      // RECARGAR
+      await cargarProductos();
+
+      setShowModal(false);
+
+      setCantidad(1);
+      setProductoId(0);
+
+      alert('Movimiento registrado correctamente');
+
+    } catch (e: any) {
+
+      console.error(e);
+
+      alert(
+        e.message ||
+        'Error registrando movimiento'
+      );
+    }
+  }
+
+  // KPIS
+  const totalProductos = productos.length;
+
+  const totalStock = productos.reduce(
+    (acc, p) => acc + p.stock,
+    0
+  );
+
+  const valorInventario = productos.reduce(
+    (acc, p) => acc + (p.stock * p.precio),
+    0
+  );
 
   return (
     <div>
+
+      {/* HEADER */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-[#1E3A8A]">Procesos (Entradas / Salidas)</h1>
+
+        <h1 className="text-3xl font-bold text-[#1E3A8A]">
+          Procesos de Inventario
+        </h1>
+
         <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#22C55E] text-white rounded-lg hover:bg-[#16a34a] transition-colors"
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#22C55E] text-white rounded-lg hover:bg-[#16a34a] transition-colors shadow-md"
         >
           <Plus className="w-5 h-5" />
-          Registrar Proceso
+          Registrar Movimiento
         </button>
+
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-[#22C55E] text-white rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm opacity-90 mb-1">Entradas este mes</div>
-              <div className="text-3xl font-bold">47</div>
-            </div>
-            <div className="text-5xl opacity-20">📥</div>
-          </div>
+      {/* ERROR */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          ❌ {error}
         </div>
-        <div className="bg-[#EF4444] text-white rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm opacity-90 mb-1">Salidas este mes</div>
-              <div className="text-3xl font-bold">30</div>
-            </div>
-            <div className="text-5xl opacity-20">📤</div>
-          </div>
-        </div>
-      </div>
+      )}
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo
-            </label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]">
-              <option>Todos</option>
-              <option>Entrada</option>
-              <option>Salida</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Producto
-            </label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]">
-              <option>Todos</option>
-              <option>Balón de Futbol</option>
-              <option>Camiseta Deportiva</option>
-              <option>Zapatillas Running</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Desde
-            </label>
-            <input
-              type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fecha Hasta
-            </label>
-            <input
-              type="date"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-            />
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button className="px-6 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#1e40af] transition-colors">
-            Filtrar
-          </button>
-        </div>
-      </div>
+      {/* CARDS */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 
-      {/* History Table */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="font-bold text-[#1E3A8A] mb-4">Historial de Movimientos</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-gray-600 border-b">
-                <th className="pb-3">Tipo</th>
-                <th className="pb-3">Producto</th>
-                <th className="pb-3">Cantidad</th>
-                <th className="pb-3">Fecha</th>
-                <th className="pb-3">Usuario</th>
-                <th className="pb-3">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((item) => (
-                <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-4">
-                    <span
-                      className={`px-3 py-1 text-white text-xs rounded font-medium ${
-                        item.tipo === 'Entrada' ? 'bg-[#22C55E]' : 'bg-[#EF4444]'
-                      }`}
-                    >
-                      {item.tipo === 'Entrada' ? '🟢 Entrada' : '🔴 Salida'}
-                    </span>
-                  </td>
-                  <td className="py-4 text-sm">{item.producto}</td>
-                  <td className="py-4 text-sm font-medium">{item.cantidad}</td>
-                  <td className="py-4 text-sm text-gray-600">{item.fecha}</td>
-                  <td className="py-4 text-sm text-gray-600">{item.usuario}</td>
-                  <td className="py-4">
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleView(item)}
-                        className="px-3 py-1 bg-[#1E3A8A] text-white text-xs rounded hover:bg-[#1e40af]"
-                      >
-                        Ver
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item.id)}
-                        className="px-3 py-1 bg-[#EF4444] text-white text-xs rounded hover:bg-[#dc2626]"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          <div className="bg-[#1E3A8A] text-white rounded-xl p-6 shadow-lg">
 
-      {/* Add Process Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-[#1E3A8A] mb-4">Registrar Proceso</h2>
-            <form className="space-y-4">
+            <div className="flex items-center justify-between">
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo <span className="text-red-500">*</span>
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="tipo"
-                      value="Entrada"
-                      checked={processType === 'Entrada'}
-                      onChange={(e) => setProcessType(e.target.value)}
-                      className="w-4 h-4 text-[#22C55E] focus:ring-[#22C55E]"
-                    />
-                    <span className="text-sm">🟢 Entrada</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="tipo"
-                      value="Salida"
-                      checked={processType === 'Salida'}
-                      onChange={(e) => setProcessType(e.target.value)}
-                      className="w-4 h-4 text-[#EF4444] focus:ring-[#EF4444]"
-                    />
-                    <span className="text-sm">🔴 Salida</span>
-                  </label>
-                </div>
+
+                <p className="text-sm opacity-80 mb-1">
+                  Productos Registrados
+                </p>
+
+                <h2 className="text-4xl font-bold">
+                  {totalProductos}
+                </h2>
+
               </div>
 
+              <div className="text-5xl opacity-20">
+                📦
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="bg-[#22C55E] text-white rounded-xl p-6 shadow-lg">
+
+            <div className="flex items-center justify-between">
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Producto <span className="text-red-500">*</span>
+
+                <p className="text-sm opacity-80 mb-1">
+                  Stock Total
+                </p>
+
+                <h2 className="text-4xl font-bold">
+                  {totalStock}
+                </h2>
+
+              </div>
+
+              <div className="text-5xl opacity-20">
+                📈
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="bg-[#F97316] text-white rounded-xl p-6 shadow-lg">
+
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="text-sm opacity-80 mb-1">
+                  Valor Inventario
+                </p>
+
+                <h2 className="text-3xl font-bold">
+                  ${valorInventario.toLocaleString()}
+                </h2>
+
+              </div>
+
+              <div className="text-5xl opacity-20">
+                💰
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* LOADING */}
+      {loading && (
+        <div className="bg-white rounded-xl shadow p-10 text-center text-gray-500 animate-pulse">
+          Conectando con API...
+        </div>
+      )}
+
+      {/* TABLA */}
+      {!loading && (
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+
+          <div className="flex items-center justify-between mb-6">
+
+            <h2 className="text-xl font-bold text-[#1E3A8A]">
+              Inventario en Tiempo Real
+            </h2>
+
+            <button
+              onClick={cargarProductos}
+              className="px-4 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#1e40af] transition-colors text-sm"
+            >
+              🔄 Actualizar
+            </button>
+
+          </div>
+
+          {productos.length === 0 ? (
+
+            <div className="text-center py-10 text-gray-400">
+              No hay productos registrados
+            </div>
+
+          ) : (
+
+            <div className="overflow-x-auto">
+
+              <table className="w-full">
+
+                <thead>
+
+                  <tr className="border-b text-left text-sm text-gray-600">
+
+                    <th className="pb-4">ID</th>
+                    <th className="pb-4">Producto</th>
+                    <th className="pb-4">Precio</th>
+                    <th className="pb-4">Stock</th>
+                    <th className="pb-4">Estado</th>
+
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+                  {productos.map(producto => (
+
+                    <tr
+                      key={producto.id}
+                      className="border-b hover:bg-gray-50 transition-colors"
+                    >
+
+                      <td className="py-4 text-gray-500">
+                        #{producto.id}
+                      </td>
+
+                      <td className="py-4 font-semibold text-gray-800">
+                        {producto.nombre}
+                      </td>
+
+                      <td className="py-4 text-gray-700">
+                        ${producto.precio.toLocaleString()}
+                      </td>
+
+                      <td className="py-4">
+
+                        <span className={`font-bold text-lg ${
+                          producto.stock <= 5
+                            ? 'text-red-500'
+                            : 'text-green-600'
+                        }`}>
+                          {producto.stock}
+                        </span>
+
+                      </td>
+
+                      <td className="py-4">
+
+                        {producto.stock <= 5 ? (
+
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600">
+                            ⚠️ Stock Bajo
+                          </span>
+
+                        ) : (
+
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-600">
+                            ✅ Disponible
+                          </span>
+
+                        )}
+
+                      </td>
+
+                    </tr>
+
+                  ))}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          )}
+
+        </div>
+
+      )}
+
+      {/* MODAL */}
+      {showModal && (
+
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+
+            <div className="flex items-center justify-between mb-6">
+
+              <h2 className="text-2xl font-bold text-[#1E3A8A]">
+                Registrar Movimiento
+              </h2>
+
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+
+            </div>
+
+            <form
+              onSubmit={registrarMovimiento}
+              className="space-y-5"
+            >
+
+              {/* TIPO */}
+              <div>
+
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo de Movimiento
                 </label>
-                <select 
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
+
+                <div className="grid grid-cols-2 gap-3">
+
+                  <button
+                    type="button"
+                    onClick={() => setTipo('Entrada')}
+                    className={`p-3 rounded-xl border transition-all ${
+                      tipo === 'Entrada'
+                        ? 'bg-[#22C55E] text-white border-[#22C55E]'
+                        : 'bg-white border-gray-300'
+                    }`}
+                  >
+                    📥 Entrada
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTipo('Salida')}
+                    className={`p-3 rounded-xl border transition-all ${
+                      tipo === 'Salida'
+                        ? 'bg-[#EF4444] text-white border-[#EF4444]'
+                        : 'bg-white border-gray-300'
+                    }`}
+                  >
+                    📤 Salida
+                  </button>
+
+                </div>
+
+              </div>
+
+              {/* PRODUCTO */}
+              <div>
+
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Producto
+                </label>
+
+                <select
+                  value={productoId}
+                  onChange={(e) =>
+                    setProductoId(Number(e.target.value))
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
                   required
                 >
-                  <option value="">Seleccionar producto</option>
-                  <option>Balón de Futbol</option>
-                  <option>Camiseta Deportiva</option>
-                  <option>Zapatillas Running</option>
-                  <option>Raqueta de Tenis</option>
-                  <option>Balón de Baloncesto</option>
+
+                  <option value={0}>
+                    Seleccionar producto
+                  </option>
+
+                  {productos.map(producto => (
+
+                    <option
+                      key={producto.id}
+                      value={producto.id}
+                    >
+                      {producto.nombre}
+                    </option>
+
+                  ))}
+
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Campo obligatorio</p>
+
               </div>
 
+              {/* CANTIDAD */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cantidad <span className="text-red-500">*</span>
+
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cantidad
                 </label>
+
                 <input
                   type="number"
-                  min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-                  placeholder="0"
-                  required
+                  min={1}
+                  value={cantidad}
+                  onChange={(e) =>
+                    setCantidad(Number(e.target.value))
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
                 />
-                <p className="text-xs text-gray-500 mt-1">Debe ser mayor a 0</p>
+
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-                  required
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                />
-              </div>
+              {/* BOTONES */}
+              <div className="flex gap-3 pt-2">
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones (opcional)
-                </label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]"
-                  rows={3}
-                  placeholder="Notas adicionales..."
-                ></textarea>
-              </div>
-
-              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>
+
                 <button
                   type="submit"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowAddModal(false);
-                  }}
-                  className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors ${
-                    processType === 'Entrada'
+                  className={`flex-1 px-4 py-3 text-white rounded-xl transition-colors ${
+                    tipo === 'Entrada'
                       ? 'bg-[#22C55E] hover:bg-[#16a34a]'
                       : 'bg-[#EF4444] hover:bg-[#dc2626]'
                   }`}
                 >
                   Registrar
                 </button>
+
               </div>
+
             </form>
+
           </div>
+
         </div>
+
       )}
 
-      {/* View Process Modal */}
-      {showViewModal && viewingProcess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-[#1E3A8A] mb-4">Detalles del Proceso</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <span
-                  className={`inline-block px-3 py-1 text-white text-sm rounded font-medium ${
-                    viewingProcess.tipo === 'Entrada' ? 'bg-[#22C55E]' : 'bg-[#EF4444]'
-                  }`}
-                >
-                  {viewingProcess.tipo === 'Entrada' ? '🟢 Entrada' : '🔴 Salida'}
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
-                <p className="text-gray-900">{viewingProcess.producto}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-                <p className="text-gray-900 font-semibold">{viewingProcess.cantidad} unidades</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                <p className="text-gray-900">{viewingProcess.fecha}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Usuario Responsable</label>
-                <p className="text-gray-900">{viewingProcess.usuario}</p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <button
-                onClick={() => {
-                  setShowViewModal(false);
-                  setViewingProcess(null);
-                }}
-                className="w-full px-4 py-2 bg-[#1E3A8A] text-white rounded-lg hover:bg-[#1e40af] transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
