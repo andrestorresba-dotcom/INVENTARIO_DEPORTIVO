@@ -46,7 +46,7 @@ Sistema web para la gestión de inventario de un almacén deportivo desarrollado
 2. Configurar MySQL en application.properties
 3. Ejecutar Spring Boot
 4. Verificar:
-   http://localhost:8080
+   [http://localhost:8080](http://localhost:8080/api/health)
 
 ## Frontend
 
@@ -69,7 +69,7 @@ http://localhost:3000/
 
 La API se ejecuta en:
 
-http://localhost:8080/api
+[http://localhost:8080/api](http://localhost:8080/api/health)
 
 ## Autor
 
